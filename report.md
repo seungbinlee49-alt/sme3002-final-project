@@ -104,6 +104,8 @@ Base model 비교 결과, diff_ratio와 diff feature를 사용한 HistGradientBo
 | Additional HGB / compact ExtraTrees tuning | 6.041059 m | Not selected |
 | Stable final ensemble | 5.985227 m | Selected |
 
+Baseline 비교의 fairness도 고려하였다. 단순 삼각측량이나 WLS는 RTT가 실제 거리와 잘 대응된다는 가정이 강한 반면, 본 데이터의 d_hat은 실제 환경 왜곡을 포함한 RTT 관측값이다. 따라서 geometry-only baseline과 ML fingerprint model을 완전히 같은 조건의 모델로 비교하는 것은 공정하지 않을 수 있다. 본 프로젝트에서는 WLS와 Robust NLS를 최종 모델의 직접 경쟁 baseline으로 과도하게 주장하지 않고, RTT fingerprint 데이터에서 실제 OOF 성능이 낮았던 후보로 해석하였다. 최종 성능 판단은 동일한 학습 데이터와 동일한 5-fold OOF 절차를 적용한 model family 간 비교를 중심으로 수행하였다.
+
 최종 모델의 장점은 네 가지이다. 첫째, RTT를 직접 거리로 역산하지 않고 fingerprint regression으로 접근하여 측정 bias와 NLOS distortion에 더 유연하게 대응하였다. 둘째, OOF validation을 사용하여 train fit overfitting을 최종 성능으로 오해하지 않도록 하였다. 셋째, 모델 조합을 임의의 고정 평균이 아니라 OOF 기반 stacking으로 구성하였다. 넷째, 여러 후보 알고리즘 중 실제 성능 개선이 확인된 구성만 최종 모델에 포함하였다.
 
 한계도 존재한다. 학습 데이터가 700개로 제한되어 있으므로 hidden 300개 데이터의 분포가 학습 데이터와 다르면 성능 차이가 발생할 수 있다. 또한 tree ensemble 기반 모델은 단순 기하학 모델보다 파일 크기가 크다. 이를 완화하기 위해 최종 모델은 `model.pkl.xz`로 압축 저장하였다. 압축 후 모델 크기는 88,506,628 bytes였고, `main.py` 실행 시간은 약 10초 수준으로 확인되었다.
@@ -119,6 +121,5 @@ Base model 비교 결과, diff_ratio와 diff feature를 사용한 HistGradientBo
 
 향후 개선 방향은 세 가지이다. 첫째, 더 다양한 위치와 환경의 RTT 데이터가 확보된다면 hidden test 분포 변화에 대한 강건성을 높일 수 있다. 둘째, 예측 좌표뿐 아니라 sample-wise uncertainty를 함께 추정하면 tail error가 큰 sample을 별도로 식별할 수 있다. 셋째, anchor별 NLOS 가능성이나 환경 구조 정보를 추가로 사용할 수 있다면, 현재의 fingerprint feature와 결합하여 P90, P95, max error를 줄이는 방향으로 개선할 수 있다.
 
-# 5. Reference
+Specific external papers were not directly reproduced in this project. The final algorithm was designed from the provided RTT dataset using feature engineering, 5-fold OOF validation, and ensemble regression. The final choice was based on OOF performance, runtime, model size, and submission compatibility.
 
-본 프로젝트에서는 특정 논문 알고리즘을 직접 재현하지 않았다. 최종 알고리즘은 제공된 RTT 데이터셋에 대해 직접 구성한 feature engineering, 5-fold OOF validation, ensemble regression 절차를 기반으로 설계하였다. 회귀 모델은 scikit-learn의 표준 모델을 사용하였으며, 최종 모델 선택은 OOF 성능, 실행 시간, 모델 크기, README 제출 조건을 기준으로 결정하였다.
