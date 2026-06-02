@@ -1,8 +1,15 @@
-﻿# 1. Motivation & Introduction
+# 1. Motivation & Introduction
+
+| Item | Information |
+|---|---|
+| Student name | 이승빈 |
+| Student ID | 12243785 |
 
 본 프로젝트의 목표는 18개 기지국에서 측정된 RTT 값을 이용하여 실내 사용자의 2차원 위치를 추정하는 것이다. 실내 환경에서는 GPS 사용이 제한적이며, 무선 신호는 벽, 기둥, 반사체, 다중경로, NLOS 조건의 영향을 크게 받는다. 따라서 RTT 값을 단순한 실제 거리로 가정하고 삼각측량이나 최소제곱법만 적용하면, 측정 bias와 비선형 왜곡 때문에 안정적인 위치 추정이 어렵다.
 
 본 프로젝트에서는 이 문제를 거리 역산 문제가 아니라 RTT fingerprint 기반 위치 회귀 문제로 정의하였다. 즉, 각 사용자에 대해 18개 anchor에서 관측된 RTT 패턴 전체를 하나의 fingerprint로 보고, 이 fingerprint와 실제 위치 사이의 비선형 관계를 학습하였다. 이 접근은 개별 RTT 값의 물리적 해석이 완벽하지 않아도, anchor 간 상대적 크기, 순위, 차이, 비율이 위치 정보를 포함한다는 점을 활용한다.
+
+무선 신호 기반 indoor positioning에서는 측정값을 절대 거리로 직접 변환하기보다, 위치별 신호 패턴을 fingerprint로 해석하고 machine learning 모델을 적용하는 접근이 널리 사용된다 [7], [8]. 본 프로젝트에서도 RTT 측정값과 실제 거리가 완전히 일치하지 않는 점을 고려하여, RTT 값을 위치별 fingerprint feature로 구성하였다.
 
 중간 프로젝트에서는 kNN fingerprinting, WLS, Robust NLS, reliability weighting, fixed ensemble 등을 사용하였다. 그러나 단순히 여러 모델을 고정 가중 평균하는 방식은 왜 특정 weight를 선택했는지, 어떤 상황에서 어떤 모델을 신뢰해야 하는지에 대한 설명이 약할 수 있다. 따라서 기말 프로젝트에서는 중간 프로젝트의 알고리즘을 그대로 반복하지 않고, OOF validation을 통해 실제 일반화 성능이 확인된 구성만 최종 모델에 남기는 방향으로 설계하였다.
 
@@ -21,9 +28,9 @@ RTT 값은 실제 거리와 직접 일치하지 않을 수 있기 때문에, 단
 | Ratio features | Pairwise RTT ratios | Improve robustness to scale distortion |
 | Weighted centroid | RTT-weighted anchor geometry | Combine fingerprint pattern with spatial anchor layout |
 
-Base model은 주로 HistGradientBoostingRegressor와 ExtraTreesRegressor 계열을 사용하였다. HistGradientBoostingRegressor는 tabular feature에서 비선형 관계를 안정적으로 학습할 수 있고, ExtraTreesRegressor는 다양한 feature interaction을 포착하는 데 유리하다. 각 feature mode와 model configuration은 5-fold OOF validation으로 평가하였다.
+Base model은 주로 HistGradientBoostingRegressor와 ExtraTreesRegressor 계열을 사용하였다. HistGradientBoostingRegressor는 tabular feature에서 비선형 관계를 안정적으로 학습할 수 있고, ExtraTreesRegressor는 다양한 feature interaction을 포착하는 데 유리하다. 각 feature mode와 model configuration은 5-fold OOF validation으로 평가하였다. Tree ensemble 계열 모델은 비선형 feature interaction을 학습할 수 있다는 장점이 있으며, 본 프로젝트에서는 random forest, extremely randomized trees, gradient boosting 계열 모델의 개념을 참고하여 RTT feature 기반 위치 회귀 모델을 구성하였다 [3], [4], [5].
 
-최종 결합 방식은 OOF stacking이다. 각 fold에서 학습 fold로 base model을 학습하고, 해당 모델이 보지 않은 validation fold에 대해 위치를 예측하였다. 이렇게 얻은 OOF 예측 좌표를 meta-level 입력으로 사용하여 RidgeCV stacking을 수행하였다. 이 과정은 train data에 다시 예측한 결과를 성능으로 착각하는 것을 방지하고, hidden test에 가까운 일반화 성능을 추정하기 위한 목적이다.
+최종 결합 방식은 OOF stacking이다. 각 fold에서 학습 fold로 base model을 학습하고, 해당 모델이 보지 않은 validation fold에 대해 위치를 예측하였다. 이렇게 얻은 OOF 예측 좌표를 meta-level 입력으로 사용하여 RidgeCV stacking을 수행하였다. 이 과정은 train data에 다시 예측한 결과를 성능으로 착각하는 것을 방지하고, hidden test에 가까운 일반화 성능을 추정하기 위한 목적이다. 여러 base model의 예측 결과를 다시 meta-model의 입력으로 사용하는 stacking ensemble은 stacked generalization 개념에 기반한다 [2]. 본 프로젝트에서는 train prediction을 그대로 사용하는 대신, 각 base model의 OOF prediction을 meta-level 입력으로 사용하여 과적합 위험을 줄이고자 하였다.
 
 최종 예측은 RidgeCV stacking 결과와 OOF 성능이 우수한 top base model average를 함께 사용하였다. 이는 한 모델의 fold별 편향에 과하게 의존하지 않기 위한 안정화 장치이다. 중요한 점은 최종 조합이 임의의 고정 평균이 아니라, OOF 성능 비교를 통해 선택되었다는 것이다.
 
@@ -94,7 +101,7 @@ Base model 비교 결과, diff_ratio와 diff feature를 사용한 HistGradientBo
 | Top6 average | 6.064031 m | 7.145607 m | 5.550491 m | 10.157828 m | 12.506698 m | 30.762770 m |
 | Final blended ensemble | 5.985227 m | 7.080726 m | 5.439129 m | 10.073312 m | 12.373707 m | 31.913228 m |
 
-추가 후보 알고리즘도 검토하였다. 중간 프로젝트에서 사용했던 kNN fingerprinting, geometry-based WLS, Robust NLS는 직관적으로 해석 가능하다는 장점이 있지만, 이번 데이터셋에서는 최종 fingerprint ensemble보다 낮은 OOF 성능을 보였다. 따라서 설명 가능한 고전적 방법을 억지로 포함하지 않고, 실제 검증 성능이 높은 모델을 최종 선택하였다.
+추가 후보 알고리즘도 검토하였다. 중간 프로젝트에서 사용했던 kNN fingerprinting, geometry-based WLS, Robust NLS는 직관적으로 해석 가능하다는 장점이 있지만, 이번 데이터셋에서는 최종 fingerprint ensemble보다 낮은 OOF 성능을 보였다. kNN fingerprinting baseline은 nearest neighbor 기반 pattern matching 개념을 바탕으로 하며, RTT 패턴이 유사한 학습 샘플의 위치를 이용해 예측하는 방식으로 구성하였다 [6]. 따라서 설명 가능한 고전적 방법을 억지로 포함하지 않고, 실제 검증 성능이 높은 모델을 최종 선택하였다.
 
 | Additional experiment | Best OOF mean | Decision |
 |---|---:|---|
@@ -121,5 +128,17 @@ Baseline 비교의 fairness도 고려하였다. 단순 삼각측량이나 WLS는
 
 향후 개선 방향은 세 가지이다. 첫째, 더 다양한 위치와 환경의 RTT 데이터가 확보된다면 hidden test 분포 변화에 대한 강건성을 높일 수 있다. 둘째, 예측 좌표뿐 아니라 sample-wise uncertainty를 함께 추정하면 tail error가 큰 sample을 별도로 식별할 수 있다. 셋째, anchor별 NLOS 가능성이나 환경 구조 정보를 추가로 사용할 수 있다면, 현재의 fingerprint feature와 결합하여 P90, P95, max error를 줄이는 방향으로 개선할 수 있다.
 
-Specific external papers were not directly reproduced in this project. The final algorithm was designed from the provided RTT dataset using feature engineering, 5-fold OOF validation, and ensemble regression. The final choice was based on OOF performance, runtime, model size, and submission compatibility.
+# 5. References
 
+본 프로젝트는 특정 논문 하나의 알고리즘을 그대로 재현한 것이 아니라, indoor positioning, fingerprinting, tree ensemble, gradient boosting, nearest neighbor, stacking ensemble, scikit-learn 구현 문서를 참고하여 수업 제공 RTT 데이터에 맞게 feature와 model selection 절차를 직접 구성하였다. 아래 표는 각 reference에서 참고한 내용, 본 프로젝트에서 직접 설계 또는 구현한 부분, 그리고 보고서와 코드에서 연결되는 위치를 구분한 것이다.
+
+| Reference | 참고한 내용 | 본 프로젝트에서 직접 설계 또는 구현한 부분 | 연결되는 보고서 또는 코드 부분 |
+|---|---|---|---|
+| [1] F. Pedregosa et al., "Scikit-learn: Machine Learning in Python," Journal of Machine Learning Research, vol. 12, pp. 2825-2830, 2011. URL: https://www.jmlr.org/papers/v12/pedregosa11a.html | Python 기반 machine learning 구현 도구인 scikit-learn의 기본 참고문헌이다. | HistGradientBoostingRegressor, ExtraTreesRegressor, RandomForestRegressor, KNeighborsRegressor, RidgeCV, KFold를 사용하여 OOF validation과 ensemble regression을 구현하였다. | `main.py`의 model import, `make_model_specs`, `fit_package`, `train.py`의 학습 및 model 저장 절차 |
+| [2] D. H. Wolpert, "Stacked Generalization," Neural Networks, vol. 5, no. 2, pp. 241-259, 1992. DOI: 10.1016/S0893-6080(05)80023-1 | 여러 base model의 예측 결과를 meta-level 입력으로 사용하는 stacking ensemble 개념을 참고하였다. | Base model의 train prediction이 아니라 OOF prediction을 meta-level 입력으로 사용하고, RidgeCV를 이용해 최종 stacking model을 구성하였다. | Algorithm Explanation의 OOF stacking 설명, `fit_package`의 OOF prediction 생성과 `meta_model` 학습 |
+| [3] J. H. Friedman, "Greedy Function Approximation: A Gradient Boosting Machine," The Annals of Statistics, vol. 29, no. 5, pp. 1189-1232, 2001. DOI: 10.1214/aos/1013203451 | Gradient boosting 계열 회귀 모델의 기본 개념을 참고하였다. | RTT fingerprint feature와 2D 위치 좌표 사이의 비선형 관계를 학습하기 위해 HistGradientBoostingRegressor 계열 모델을 후보로 구성하고 OOF 성능으로 선택하였다. | Algorithm Explanation의 base model 설명, Results의 HistGBR base model 비교, `make_model_specs`의 HistGBR 후보 |
+| [4] L. Breiman, "Random Forests," Machine Learning, vol. 45, pp. 5-32, 2001. DOI: 10.1023/A:1010933404324 | 여러 decision tree를 결합하여 예측 안정성을 높이는 ensemble tree 모델의 기본 개념을 참고하였다. | RandomForestRegressor를 후보 모델로 검토하고, tree ensemble 계열 모델 간 OOF 성능을 비교하였다. | `make_model_specs`의 RandomForestRegressor 후보와 Results의 후보 알고리즘 선택 기준 |
+| [5] P. Geurts, D. Ernst, and L. Wehenkel, "Extremely Randomized Trees," Machine Learning, vol. 63, pp. 3-42, 2006. DOI: 10.1007/s10994-006-6226-1 | ExtraTreesRegressor의 기반이 되는 extremely randomized trees 개념을 참고하였다. | 다양한 RTT feature 조합의 비선형 interaction을 학습하기 위한 후보 모델로 ExtraTreesRegressor를 사용하였다. | Algorithm Explanation의 ExtraTrees 설명, Results의 `rawlog_ET_leaf1` 비교, `make_model_specs`의 ExtraTrees 후보 |
+| [6] T. Cover and P. Hart, "Nearest Neighbor Pattern Classification," IEEE Transactions on Information Theory, vol. 13, no. 1, pp. 21-27, 1967. DOI: 10.1109/TIT.1967.1053964 | Nearest neighbor 기반 pattern matching 개념을 참고하였다. | RTT fingerprint가 유사한 학습 샘플의 위치를 이용해 예측하는 kNN fingerprinting baseline을 비교 대상으로 사용하였다. | Results의 additional experiment 표, `make_model_specs`의 KNeighborsRegressor 후보, 별도 kNN 실험 결과 |
+| [7] V. Bellavista-Parent, J. Torres-Sospedra, and A. Perez-Navarro, "New trends in indoor positioning based on WiFi and machine learning: A systematic review," arXiv:2107.14356, 2021. URL: https://arxiv.org/abs/2107.14356 | 무선 신호 fingerprint와 machine learning을 이용한 indoor positioning 연구 흐름을 참고하였다. | RTT 측정값을 단순 거리값이 아니라 위치별 fingerprint로 해석하고, feature engineering과 OOF 기반 model selection으로 최종 위치 회귀 모델을 설계하였다. | Motivation의 RTT fingerprint 문제 정의, Algorithm Explanation의 feature engineering 설명 |
+| [8] P. Bahl and V. N. Padmanabhan, "RADAR: An In-Building RF-Based User Location and Tracking System," IEEE INFOCOM, pp. 775-784, 2000. DOI: 10.1109/INFCOM.2000.832252 | 실내 무선 측정값을 위치 추정을 위한 fingerprint로 활용하는 초기 indoor localization 연구를 참고하였다. | RADAR의 RSS radio map을 그대로 구현하지 않고, 제공된 RTT `d_hat`을 anchor별 fingerprint로 해석하여 2D 위치 회귀 feature를 직접 구성하였다. | Motivation의 fingerprint 접근 설명, `build_features`의 raw, sorted, difference, ratio RTT feature 구성 |
