@@ -92,7 +92,7 @@ Base model 비교 결과, diff_ratio와 diff feature를 사용한 HistGradientBo
 | diff_HistGBR_b | diff | 6.293351 m | 5.801087 m | 10.950526 m | 30.432359 m |
 | rawlog_ET_leaf1 | raw_log_sort | 6.368976 m | 5.735148 m | 11.097907 m | 36.262797 m |
 
-최종 ensemble은 best single base model보다 평균 오차를 낮추었다. Best single base model의 OOF mean은 6.165127 m였고, Ridge stacking은 6.013934 m, 최종 blended ensemble은 5.985227 m를 기록하였다. 이는 서로 다른 feature mode와 model family가 일부 다른 sample에서 보완적인 예측을 제공했기 때문으로 해석된다.
+최종 ensemble은 best single base model보다 평균 오차를 낮추었다. 아래 표에서 볼 수 있듯이 Ridge stacking과 top base model average는 서로 다른 장단점을 보였고, final blended ensemble은 두 예측의 보완성을 활용하였다. 이는 서로 다른 feature mode와 model family가 일부 다른 sample에서 보완적인 예측을 제공했기 때문으로 해석된다.
 
 | Model configuration | Mean | RMSE | Median | P90 | P95 | Max |
 |---|---:|---:|---:|---:|---:|---:|
@@ -125,7 +125,7 @@ Baseline 비교의 fairness도 고려하였다. 단순 삼각측량이나 WLS는
 
 최종 모델의 장점은 네 가지이다. 첫째, RTT를 직접 거리로 역산하지 않고 fingerprint regression으로 접근하여 측정 bias와 NLOS distortion에 더 유연하게 대응하였다. 둘째, OOF validation을 사용하여 train fit overfitting을 최종 성능으로 오해하지 않도록 하였다. 셋째, 모델 조합을 임의의 고정 평균이 아니라 OOF 기반 stacking으로 구성하였다. 넷째, 여러 후보 알고리즘 중 실제 성능 개선이 확인된 구성만 최종 모델에 포함하였다.
 
-한계도 존재한다. 학습 데이터가 700개로 제한되어 있으므로 hidden 300개 데이터의 분포가 학습 데이터와 다르면 성능 차이가 발생할 수 있다. 또한 tree ensemble 기반 모델은 단순 기하학 모델보다 파일 크기가 크다. 이를 완화하기 위해 최종 모델은 `model.pkl.xz`로 압축 저장하였다. 압축 후 모델 크기는 88,506,628 bytes였고, `main.py` 실행 시간은 약 10초 수준으로 확인되었다.
+한계도 존재한다. 학습 데이터가 제한되어 있으므로 hidden 데이터의 분포가 학습 데이터와 다르면 성능 차이가 발생할 수 있다. 또한 tree ensemble 기반 모델은 단순 기하학 모델보다 파일 크기가 크다. 이를 완화하기 위해 최종 모델은 `model.pkl.xz`로 압축 저장하였다. 압축 후 모델 크기와 `main.py` 실행 시간은 아래 제출 확인 표에 정리하였다.
 
 | Submission check | Result |
 |---|---:|
